@@ -9,5 +9,8 @@ dist/
 .venv/
 venv/
 
+# Generated CAD outputs
+examples_reactor/output/
+
 # macOS
 .DS_Store
