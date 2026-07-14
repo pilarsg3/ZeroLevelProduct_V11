@@ -64,14 +64,14 @@ def create_above_core_structure(
     top_cyl_offset_y: float,
     flow_hole_groups: list[dict] | None = None,
     # dict with keys:
-    #   "through_d":          inner bore diameter [m]                (required)
-    #   "pitch":              center-to-center hex ring spacing [m]  (required)
-    #   "pipe_wall_t":        tube wall thickness [m]                (default 0.0)
-    #   "pipe_extend_bottom": protrusion below z=0 [m]               (default 0.0)
-    #   "pipe_extend_top":    protrusion above top cylinder [m]      (default 0.0)
+    #   "through_d":          inner bore diameter                  (required)
+    #   "pitch":              center-to-center hex ring spacing    (required)
+    #   "pipe_wall_t":        tube wall thickness                  (default 0.0)
+    #   "pipe_extend_bottom": protrusion below z=0                 (default 0.0)
+    #   "pipe_extend_top":    protrusion above top cylinder        (default 0.0)
     crdl: dict | None = None,
     # dict with keys:
-    #   "thickness": plate thickness [m]
+    #   "thickness": plate thickness
     # The plate spans z = 0 → thickness (upward, into the bore), so its
     # bottom face is coincident with the shell's bottom face at z=0. Outer
     # radius is cone_bottom_outer_r - wall_t (the shell's inner radius at the
@@ -163,7 +163,7 @@ def create_above_core_structure(
                 r_out = cone_bottom_outer_r + frac * (neck_outer_r - cone_bottom_outer_r)
             else:
                 r_out = neck_outer_r
-            EPS_h = 1e-4
+            # OLDER VERSION (absolute): EPS_h = 1e-4 (used as over = hole_r + EPS_h)
             # Drill each hole ALONG THE LOCAL SURFACE NORMAL so the opening is a
             # true circle on the wall, not the ellipse a horizontal drill leaves
             # on a slanted surface. Local meridian slope of the outer surface:
@@ -179,7 +179,7 @@ def create_above_core_structure(
             # Reach a full hole_r beyond each wall face, so the hole opens
             # cleanly through the wall and into the hollow cavity (you can see
             # in). The overshoot only passes into the empty interior.
-            over  = hole_r + EPS_h
+            over  = 1.001 * hole_r     # relative over-reach (was hole_r + 1e-4)
             depth = wall_t + 2 * over
             for i in range(n):
                 a     = math.radians(start_a + 360.0 * i / n)
@@ -231,7 +231,7 @@ def create_above_core_structure(
             a = math.radians(60.0 * i)
             centers.append((pitch * math.cos(a), pitch * math.sin(a)))
 
-        EPS = 1e-4
+        EPS = 1e-3 * pipe_h   # relative cutter over-length (was 1e-4 absolute)
         for hx, hy in centers:
             bore_cutter = (
                 cq.Workplane("XY")
@@ -277,7 +277,7 @@ def create_above_core_structure(
                 a = math.radians(60.0 * i)
                 p_centers.append((p_pitch * math.cos(a), p_pitch * math.sin(a)))
 
-            EPS = 1e-4
+            EPS = 1e-3 * plate_t   # relative cutter over-length (was 1e-4 absolute)
             for hx, hy in p_centers:
                 hole = (
                     cq.Workplane("XY")

@@ -168,16 +168,21 @@ def add_nozzle_bosses(
     margin = nozzle_r_boss
     if not (z_bottom + margin < nozzle_z_abs < z_top - margin):
         raise ValueError(
-            f"nozzle_z_abs={nozzle_z_abs:.4f} m clips the diagrid face. "
+            f"nozzle_z_abs={nozzle_z_abs:.4f} clips the diagrid face. "
             f"Must be in ({z_bottom + margin:.4f}, {z_top - margin:.4f})."
         )
 
     inset_min         = radius_outer - math.sqrt(radius_outer**2 - nozzle_r_boss**2)
-    inset_safe        = inset_min + 0.005
+    # OLDER VERSION (unit-carrying margins):
+    # inset_safe  = inset_min + 0.005
+    # bore_length = L_min + 0.010
+    # Scale-free fusion/over-cut margin: a fraction of the side wall.
+    margin            = 0.1 * (radius_outer - radius_inner)
+    inset_safe        = inset_min + margin
     boss_total_height = inset_safe + nozzle_boss_height
 
     L_min       = (radius_outer + nozzle_boss_height) - math.sqrt(radius_inner**2 - nozzle_r_bore**2)
-    bore_length = L_min + 0.010
+    bore_length = L_min + margin
 
     shell: cq.Workplane        = diagrid_solid
     boss_solids: list[cq.Workplane] = []

@@ -17,6 +17,7 @@ pump = {
     "flange_width":   0.548,
     "flange_height":  0.900,
     "flange_depth":   0.500,
+    "flange_z_top":   11.5,
 }
 assy = assemble_objects([pump])
 show(assy)

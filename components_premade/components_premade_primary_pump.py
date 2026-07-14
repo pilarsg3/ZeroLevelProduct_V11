@@ -149,7 +149,12 @@ def create_primary_pump(
     """
 
     if flange_z_top is None:
-        flange_z_top = barrel_height - 0.5
+        # OLDER VERSION (unit-carrying default): flange_z_top = barrel_height - 0.5
+        raise ValueError(
+            "create_primary_pump requires 'flange_z_top' (top of the flange, "
+            "measured from the barrel bottom). No default: the old fallback "
+            "barrel_height - 0.5 assumed metre-scale geometry."
+        )
 
     overshoot       = elbow_overshoot(barrel_wall_t)
     inner_overshoot = nozzle_wall_t * 2
@@ -194,7 +199,7 @@ def create_primary_pump(
         .workplane(offset=0)
         .center(0, nozzle_z)
         .circle(nozzle_r_bore)
-        .extrude(barrel_radius + 1.0)
+        .extrude(barrel_radius + barrel_wall_t)   # one wall past the outer surface (was +1.0 absolute)
     )
     bore_punch_left = bore_punch_right.mirror("YZ")
  
@@ -239,6 +244,7 @@ if __name__ == "__main__":
         flange_width   = 0.548,
         flange_height  = 0.900,
         flange_depth   = 0.500,
+        flange_z_top   = 11.5,
     )
     show(pump)
  

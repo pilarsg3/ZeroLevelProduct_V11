@@ -14,7 +14,6 @@ ihx_small = {
 
     "bundle_height": 3.2,
     "tube_rings": [
-        dict(n=8,  inner_radius=0.015, wall=0.002, pitch_radius=0.095),
         dict(n=16, inner_radius=0.015, wall=0.002, pitch_radius=0.215),
     ],
 
@@ -41,7 +40,6 @@ ihx_medium = {
 
     "bundle_height": 5.4,
     "tube_rings": [
-        dict(n=8,  inner_radius=0.018, wall=0.002, pitch_radius=0.095),
         dict(n=16, inner_radius=0.018, wall=0.002, pitch_radius=0.215),
         dict(n=24, inner_radius=0.016, wall=0.002, pitch_radius=0.345),
         dict(n=32, inner_radius=0.014, wall=0.002, pitch_radius=0.470),
@@ -76,8 +74,6 @@ ihx_large = {
 
     "bundle_height": 7.8,
     "tube_rings": [
-        dict(n=8,  inner_radius=0.018, wall=0.002, pitch_radius=0.095),
-        dict(n=16, inner_radius=0.016, wall=0.002, pitch_radius=0.215),
         dict(n=24, inner_radius=0.014, wall=0.002, pitch_radius=0.355),
         dict(n=32, inner_radius=0.012, wall=0.002, pitch_radius=0.495),
         dict(n=48, inner_radius=0.012, wall=0.002, pitch_radius=0.645),

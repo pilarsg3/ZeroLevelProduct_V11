@@ -29,6 +29,7 @@ pump = {
     "flange_width":   0.520,
     "flange_height":  0.850,
     "flange_depth":   0.480,
+    "flange_z_top":   9.5,
     "at_radius":      3.500,
     "at_angle_deg":   0.0,
 }

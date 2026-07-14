@@ -297,7 +297,8 @@ def _build_cylinder_closed_bottom(obj: Dict[str, Any], index: int) -> cq.Workpla
     elif head_type == "ellipsoidal":
         # Shrink head_depth by wall_t for the inner ellipsoid
         inner_params = dict(head_params)
-        inner_params["head_depth"] = max(float(head_params["head_depth"]) - t, 1e-3)
+        hd = float(head_params["head_depth"])
+        inner_params["head_depth"] = max(hd - t, 0.01 * hd)   # relative floor (was 1e-3 absolute)
         inner_head = _build_outer_head(id_, head_type, inner_params).translate((0, 0, -h / 2))
         inner = inner_cyl.union(inner_head)
 

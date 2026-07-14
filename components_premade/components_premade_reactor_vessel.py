@@ -1,12 +1,13 @@
 """
 Reactor vessel (RV) builder.
 
-Constructs a hollow cylindrical vessel with a choice of bottom head geometry
-and an optional top closure plate with arbitrary hole patterns.
+Constructs a hollow cylindrical vessel with a choice of bottom/top head
+geometry.
 
 The vessel shell always runs from z=0 to z=straight_h, so the top face is
-exactly at z=straight_h — no bounding box lookup needed. The top plate
-centroid is placed at z=straight_h + plate_thickness/2.
+exactly at z=straight_h — no bounding box lookup needed. For a top plate,
+use the separate obj_type="reactor_top_plate" component (the old
+vessel-embedded plate option was removed — see the note in the signature).
 
 Example
 -------
@@ -16,11 +17,6 @@ Example
 ...     straight_h = 5.5,
 ...     bottom_head_type   = "ellipsoidal",
 ...     bottom_head_params = {"head_depth": 1.0},
-...     top_plate_thickness = 0.1,
-...     top_plate_hole_groups=[
-...         dict(hole_diameter=0.52, layout="custom_angles",
-...              angles_deg=[0.0, 90.0, 180.0, 270.0], placement_radius=1.7),
-...     ],
 ... )
 """
 
@@ -172,8 +168,11 @@ def create_reactor_vessel(
     bottom_head_params: dict | None = None,
     top_head_type:      str | None = None,
     top_head_params:    dict | None = None,
-    top_plate_thickness:   float | None = None,
-    top_plate_hole_groups: list[dict[str, Any]] | None = None,
+    # REMOVED (older version): top_plate_thickness / top_plate_hole_groups —
+    # the vessel-embedded top plate (fused into the vessel solid) was ≤V6
+    # legacy, bypassed the resolver (no auto-holes, no IHX alignment, no
+    # validation) and was used by nothing. Use a separate
+    # obj_type="reactor_top_plate" component instead.
 ) -> cq.Workplane:
     """
     Build a reactor vessel with optional head geometries and top plate.
@@ -210,24 +209,19 @@ def create_reactor_vessel(
 
     top_head_type : str, optional
         Same options as bottom_head_type. If None, the vessel has an open top.
-        Note: if top_plate_thickness is also given, the top head sits on top
-        of the plate (head rim at z = straight_h + top_plate_thickness).
+        The head rim sits at z = straight_h.
     top_head_params : dict, optional
         Same structure as bottom_head_params.
 
-    top_plate_thickness : float, optional
-        If given, a flat closure plate of this thickness is created and
-        fused into the returned vessel solid. Its bottom face sits flush
-        at z=straight_h; a top head, if present, sits on top of the plate.
-    top_plate_hole_groups : list[dict], optional
-        Passed directly to create_top_plate. See create_top_plate for the
-        full hole_groups specification.
+    For a top plate, use the separate obj_type="reactor_top_plate" component
+    (resolver-aware: auto-holes, IHX alignment, validation). The old
+    vessel-embedded plate (top_plate_thickness/top_plate_hole_groups) was
+    removed — see the note in the signature.
 
     Returns
     -------
     cq.Workplane
-        Single fused solid: shell + heads, with the top plate fused in
-        if top_plate_thickness is given.
+        Single fused solid: shell + heads.
     """
     if straight_h <= 0: raise ValueError("straight_h must be > 0")
 
@@ -288,7 +282,9 @@ def create_reactor_vessel(
     elif bottom_head_type is not None:
         outer = outer.union(_build_outer_head(outer_d, bottom_head_type, bottom_head_params))
 
-    top_head_z = straight_h + (top_plate_thickness or 0.0)
+    # OLDER VERSION (embedded plate lifted the head above the fused plate):
+    # top_head_z = straight_h + (top_plate_thickness or 0.0)
+    top_head_z = straight_h
     if top_head_type == "flat":
         t = float(top_head_params["plate_t"])
         outer = outer.union(
@@ -305,7 +301,7 @@ def create_reactor_vessel(
     if bottom_head_type == "ellipsoidal":
         hd = float(bottom_head_params["head_depth"])
         p = dict(bottom_head_params)
-        p["head_depth"] = max(hd - wall_t, 1e-3)
+        p["head_depth"] = max(hd - wall_t, 0.01 * hd)   # relative floor (was 1e-3 absolute)
         inner = inner.union(_build_outer_head(inner_d, "ellipsoidal", p))
     elif bottom_head_type not in (None, "flat"):
         inner = inner.union(_build_outer_head(inner_d, bottom_head_type, bottom_head_params))
@@ -316,7 +312,7 @@ def create_reactor_vessel(
     if top_head_type == "ellipsoidal":
         hd = float(top_head_params["head_depth"])
         p = dict(top_head_params)
-        p["head_depth"] = max(hd - wall_t, 1e-3)
+        p["head_depth"] = max(hd - wall_t, 0.01 * hd)   # relative floor (was 1e-3 absolute)
         inner = inner.union(_build_top_head(inner_d, "ellipsoidal", p, top_head_z))
     elif top_head_type not in (None, "flat"):
         inner = inner.union(_build_top_head(inner_d, top_head_type, top_head_params, top_head_z))
@@ -341,23 +337,24 @@ def create_reactor_vessel(
 
 
     # ------------------------------------------------------------------ #
-    # 3.  Top plate                                                        #
+    # 3.  OLDER VERSION — vessel-embedded top plate (REMOVED)              #
     # ------------------------------------------------------------------ #
-    top_plate = None
-    if top_plate_thickness is not None:
-        from components_premade.components_premade_top_plate import create_top_plate
-        top_plate = create_top_plate(
-            outer_d         = outer_d,
-            thickness       = top_plate_thickness,
-            center_coords   = (0.0, 0.0, straight_h + top_plate_thickness / 2.0),
-            hole_groups     = top_plate_hole_groups,
-        )
+    # The ≤V6 option that built a plate here and fused it into the vessel
+    # solid. Removed: it bypassed the resolver (no auto-holes, no IHX
+    # alignment, no validation) and confused the two top-plate mechanisms.
+    # Use the standalone obj_type="reactor_top_plate" component instead.
+    # top_plate = None
+    # if top_plate_thickness is not None:
+    #     from components_premade.components_premade_top_plate import create_top_plate
+    #     top_plate = create_top_plate(
+    #         outer_d         = outer_d,
+    #         thickness       = top_plate_thickness,
+    #         center_coords   = (0.0, 0.0, straight_h + top_plate_thickness / 2.0),
+    #         hole_groups     = top_plate_hole_groups,
+    #     )
+    # if top_plate is not None:
+    #     return vessel.union(top_plate).clean()
 
-    # ------------------------------------------------------------------ #
-    # 4.  Assemble                                                         #
-    # ------------------------------------------------------------------ #
-    if top_plate is not None:
-        return vessel.union(top_plate).clean()
     return vessel
 
 
@@ -370,8 +367,8 @@ if __name__ == "__main__":
     from ocp_vscode import show
 
     # ------------------------------------------------------------------
-    # Example A: ellipsoidal bottom, no top head, flat top plate with
-    # 4 IHX penetrations matching REACTOR_HX layout (r=1.7, 4-fold)
+    # Example A: ellipsoidal bottom, open top (for a top plate use the
+    # separate reactor_top_plate component)
     # ------------------------------------------------------------------
     assembly_A = create_reactor_vessel(
         inner_d    = 4.72,
@@ -379,15 +376,6 @@ if __name__ == "__main__":
         straight_h = 5.5,
         bottom_head_type   = "ellipsoidal",
         bottom_head_params = {"head_depth": 1.0},
-        top_plate_thickness = 0.1,
-        top_plate_hole_groups=[
-            dict(
-                hole_diameter    = 0.52,
-                layout           = "custom_angles",
-                angles_deg       = [0.0, 90.0, 180.0, 270.0],
-                placement_radius = 1.7,
-            ),
-        ],
     )
     show(assembly_A)
     import time; time.sleep(2)
@@ -405,8 +393,7 @@ if __name__ == "__main__":
     show(assembly_B)
     import time; time.sleep(2)
     # ------------------------------------------------------------------
-    # Example C: ellipsoidal bottom, ellipsoidal top head, flat top plate
-    # with a central penetration — plate sits on top of the dome.
+    # Example C: ellipsoidal bottom AND ellipsoidal top head (closed vessel)
     # ------------------------------------------------------------------
     assembly_C = create_reactor_vessel(
         inner_d    = 4.72,
@@ -416,14 +403,5 @@ if __name__ == "__main__":
         bottom_head_params = {"head_depth": 1.0},
         top_head_type      = "ellipsoidal",
         top_head_params    = {"head_depth": 1.0},
-        top_plate_thickness = 0.1,
-        top_plate_hole_groups=[
-            dict(
-                hole_diameter    = 0.3,
-                layout           = "custom_angles",
-                angles_deg       = [0.0],
-                placement_radius = 0.0,
-            ),
-        ],
     )
     show(assembly_C)

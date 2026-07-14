@@ -1,9 +1,11 @@
 """
 Assembly and validation workflow for reactor components.
 
-UNITS: All component parameters are UNITLESS. The user must choose a consistent
-unit system (e.g., metres, millimetres) and apply it uniformly across all
-components. The code does not enforce, convert, or validate units.
+UNITS: Geometry is UNIT-AGNOSTIC — choose one consistent unit system for all
+inputs (metres, millimetres, ...). Units exist in exactly one place: the
+required `units=` argument of assemble_objects() when exporting, which sets
+the STEP file's length-unit declaration so the file means what the spec
+meant (previously OCCT silently declared millimetres regardless of input).
 
 Key features:
   • Resolver integration: automatically applies connection rules to compute
@@ -42,6 +44,13 @@ _ASSEMBLY_LEVEL_KEYS = (
     "color", "interfaces_with", "manual_placement",
     "auto_hole", "hole_diameter",
 )
+
+# STEP length-unit codes accepted by the OCCT writer, keyed by the
+# user-facing `units=` argument of assemble_objects().
+_STEP_UNITS = {
+    "m": "M", "mm": "MM", "cm": "CM", "um": "UM", "km": "KM",
+    "inch": "INCH", "ft": "FT",
+}
 
 
 def _color_from_id(obj_id: str) -> cq.Color:
@@ -543,8 +552,7 @@ def _component_plate_diameter(comp: Dict[str, Any]):
     return None
 
 
-def _compute_hole_for_component(comp: Dict[str, Any],
-                                top_plate: Dict[str, Any]):
+def _compute_hole_for_component(comp: Dict[str, Any]):
     """One auto-hole group (explicit Cartesian position) for a component,
     or None (opted out via auto_hole: false / not a plate-piercing type /
     position unknown)."""
@@ -559,9 +567,13 @@ def _compute_hole_for_component(comp: Dict[str, Any],
     if "hole_diameter" in comp:
         hole_d = float(comp["hole_diameter"])
     else:
-        # NOTE: 0.015 default retained for now - the pending units plan will
-        # make auto_hole_clearance a required top-plate key.
-        hole_d = d_comp + top_plate.get("auto_hole_clearance", 0.015)
+        # OLDER VERSION (unit-carrying clearance default):
+        # hole_d = d_comp + top_plate.get("auto_hole_clearance", 0.015)
+        # Exact fit by design decision: the auto hole diameter equals the
+        # component diameter (coincident faces, matching the manual hole
+        # groups and the redan-penetration convention). Use the
+        # per-component "hole_diameter" override when clearance is wanted.
+        hole_d = d_comp
     return {
         "hole_diameter": hole_d,
         "layout": "explicit_positions",
@@ -578,7 +590,7 @@ def auto_generate_topplate_holes(resolved_dicts: List[Dict[str, Any]]) -> None:
 
     Two channels, both supported:
       - automatic: one hole per component at its nominal position, sized
-        component diameter + auto_hole_clearance (or the component's
+        EXACTLY to the component diameter (or the component's
         'hole_diameter' override); disable per component with auto_hole: false.
       - manual: top_plate['hole_groups'] - any layout (symmetric,
         custom_angles, explicit_positions), any number of groups/radii/sizes.
@@ -611,7 +623,7 @@ def auto_generate_topplate_holes(resolved_dicts: List[Dict[str, Any]]) -> None:
     for comp in resolved_dicts:
         if comp.get("obj_type") not in _PLATE_PIERCING_TYPES:
             continue
-        hole = _compute_hole_for_component(comp, top_plate)
+        hole = _compute_hole_for_component(comp)
         if hole is None:
             continue
         px, py = hole["positions"][0]
@@ -1054,13 +1066,20 @@ def _check_built_solid(solid: cq.Workplane | None, obj_id: str) -> None:
         )
 
 
-def assemble_objects(object_specs: List[Dict[str, Any]], export_path: str | None = None) -> cq.Assembly:
+def assemble_objects(object_specs: List[Dict[str, Any]], export_path: str | None = None,
+                     units: str | None = None) -> cq.Assembly:
     """
     Build a list of objects and assemble them.
 
     Accepts raw component dicts — the resolver and operation defaults are
     applied automatically, so callers only need to define geometry dicts,
     pass them here, and call show() on the result.
+
+    units — REQUIRED whenever export_path is given: the unit your spec
+    numbers are in (e.g. "m", "mm", "cm"). It is written into the STEP
+    header so the file is physically correct; the geometry itself stays
+    unit-agnostic and no numbers are rescaled. Viewer-only calls (no
+    export_path) need no units.
 
     Geometry validation happens INLINE in the build loop: each solid is
     checked (build failure / null shape / zero volume) right after it is
@@ -1208,6 +1227,29 @@ def assemble_objects(object_specs: List[Dict[str, Any]], export_path: str | None
 
     # ── STEP export (overlap shapes excluded) ──────────────────────────
     if export_path is not None:
+        if units is None:
+            raise ValueError(
+                "assemble_objects: 'units' is required when exporting — the "
+                "STEP format demands a length-unit declaration (previously "
+                "OCCT silently wrote millimetres regardless of input). "
+                "Accepted: " + ", ".join(sorted(_STEP_UNITS)) + "."
+            )
+        unit_key = str(units).lower()
+        if unit_key not in _STEP_UNITS:
+            raise ValueError(
+                f"assemble_objects: unknown units {units!r}. Accepted: "
+                + ", ".join(sorted(_STEP_UNITS)) + "."
+            )
+        # Declare the unit in the STEP header — numbers are written as-is.
+        # Constructing a STEPControl_Writer first registers OCCT's static
+        # parameter table (SetCVal_s is a silent no-op before that).
+        from OCP.STEPControl import STEPControl_Writer   # type: ignore
+        from OCP.Interface import Interface_Static       # type: ignore
+        STEPControl_Writer()
+        if not Interface_Static.SetCVal_s("write.step.unit", _STEP_UNITS[unit_key]):
+            raise RuntimeError(
+                f"Could not set the STEP unit {_STEP_UNITS[unit_key]!r} via OCCT."
+            )
         import os
         parent = os.path.dirname(export_path)
         if parent:

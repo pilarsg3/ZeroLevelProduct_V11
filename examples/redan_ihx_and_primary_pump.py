@@ -27,7 +27,6 @@ ihx = {
     "upper_plenum_height":       0.600, "upper_plenum_dome_radius": 0.785,
     "bundle_height": 8.0,
     "tube_rings": [
-        dict(n=8,  inner_radius=0.018, wall=0.002, pitch_radius=0.12),
         dict(n=16, inner_radius=0.016, wall=0.002, pitch_radius=0.25),
         dict(n=24, inner_radius=0.014, wall=0.002, pitch_radius=0.40),
     ],
@@ -62,6 +61,7 @@ pump = {
     "flange_width":   0.520,
     "flange_height":  0.850,
     "flange_depth":   0.480,
+    "flange_z_top":   11.5,
     "rotation_angles": (0.0, 0.0, 0.0),
 }
 
@@ -83,6 +83,7 @@ pump2 = {
     "flange_width":   0.520,
     "flange_height":  0.850,
     "flange_depth":   0.480,
+    "flange_z_top":   11.5,
     "rotation_angles": (0.0, 0.0, 180.0),
 }
 

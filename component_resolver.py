@@ -167,8 +167,28 @@ def _resolve_pump_diagrid(dicts: list[dict]) -> None:
     if not pumps:
         return
 
-    # Reference pump for elbow geometry — all pumps in one assembly share it.
-    ref         = pumps[0]
+    # ASSUMPTION (enforced below): all primary pumps in one assembly share
+    # the same geometry. Physically they are identical units, and the diagrid
+    # boss parameters (bore, boss radius, protrusion, connection height) are
+    # derived ONCE from a single reference pump. Supporting heterogeneous
+    # pumps would require per-boss sizing in add_nozzle_bosses — implement
+    # that only if a real use case appears.
+    _PUMP_GEOMETRY_KEYS = (
+        "barrel_radius", "barrel_wall_t",
+        "nozzle_r_pipe", "nozzle_wall_t", "nozzle_L_leg", "nozzle_R_bend",
+        "nozzle_arc_deg", "nozzle_L_inlet", "nozzle_z",
+    )
+    ref = pumps[0]
+    for p in pumps[1:]:
+        for key in _PUMP_GEOMETRY_KEYS:
+            if p.get(key) != ref.get(key):
+                raise ValueError(
+                    f"Pump '{p.get('obj_id')}' differs from pump "
+                    f"'{ref.get('obj_id')}' in '{key}' "
+                    f"({p.get(key)!r} vs {ref.get(key)!r}). All primary pumps "
+                    f"in one assembly must share the same geometry — the "
+                    f"diagrid bosses are derived from a single reference pump."
+                )
     mouth_local = pump_elbow_mouth_local(ref)
 
     # OLDER VERSION — pre-build one pump to measure its centroid (needed when

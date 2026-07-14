@@ -92,8 +92,8 @@ def _make_cutter(hole_d: float, thickness: float, x: float, y: float) -> cq.Work
     Return a solid cylinder centred at (x, y, 0) — through the full plate
     thickness which is centred at z=0.  Used as a Boolean cutter.
     """
-    EPS = 1e-3
-    cut_h = thickness + 2.0 * EPS
+    # OLDER VERSION (absolute): EPS = 1e-3; cut_h = thickness + 2.0 * EPS
+    cut_h = 1.002 * thickness   # slight relative over-length so the cut clears both faces
     return cq.Workplane("XY").cylinder(cut_h, hole_d / 2.0).translate((x, y, 0.0))
 
 

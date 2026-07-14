@@ -126,6 +126,20 @@ def create_ihx(spec: Dict[str, Any]) -> cq.Workplane:
                  r * math.sin(math.radians(a0_deg + 360.0 * i / n)))
                 for i in range(n)]
 
+    # Tubes must clear the central pipe: they can neither intersect it nor
+    # sit inside it. Fail loudly — a ring inside the pipe would otherwise be
+    # silently destroyed by the central-pipe bore cut at the end of the build.
+    for i, ring in enumerate(tube_rings):
+        r_or_t  = float(ring["inner_radius"]) + float(ring["wall"])
+        closest = min(math.hypot(tx, ty) for tx, ty in _ring_xy(ring)) - r_or_t
+        if closest < cp_or:
+            raise ValueError(
+                f"tube_rings[{i}]: tube surfaces reach within {closest:.4g} of "
+                f"the IHX axis, but the central pipe extends to radius "
+                f"{cp_or:.4g}. Tubes must clear the central pipe (closest "
+                f"approach >= {cp_or:.4g}) — move the ring outward or remove it."
+            )
+
     # 1. LOWER PLENUM SHELL
     lp_sh = _fuse(
         _dome_shell(lp_dr, lp_wall, z_eq=0.0, keep_upper=False),
@@ -251,7 +265,13 @@ def create_ihx(spec: Dict[str, Any]) -> cq.Workplane:
     # Riser dome bore: cut slightly smaller than riser outer radius so the
     # riser wall (outer = rs_or) has _r_overshoot radial overlap with the dome
     # material → volumetric overlap → guaranteed OCCT fusion.
-    up_sh = up_sh.cut(_solid_disc(rs_or - _r_overshoot, up_dr * 2 + 2, z_bot=z_up_top - 1))
+    # OLDER VERSION (unit-carrying constants — the "-1" reached below the
+    # upper-plenum bottom plate at metre scale and punched a hole through it):
+    # up_sh = up_sh.cut(_solid_disc(rs_or - _r_overshoot, up_dr * 2 + 2, z_bot=z_up_top - 1))
+    # Geometry-derived bounds: start a wall-fraction below the dome base
+    # (_overshoot), cut up past the dome tip (2*up_dr) — scale-free, and the
+    # cutter can never reach the bottom plate.
+    up_sh = up_sh.cut(_solid_disc(rs_or - _r_overshoot, 2 * up_dr, z_bot=z_up_top - _overshoot))
     # No holes pre-cut for the central pipe or tubes. The central pipe
     # (z_cp_bot inside the lower plate, horizontal sweep through the +X wall)
     # and all tubes (_overshoot puts them inside the bottom plate) will
@@ -304,7 +324,7 @@ def create_ihx(spec: Dict[str, Any]) -> cq.Workplane:
         cq.Workplane("YZ").workplane(offset=0)
         .center(0, z_rs_bot + lat_z)
         .circle(lat_or)
-        .extrude(rs_or + 1.0)
+        .extrude(rs_or + lat_or)   # one lateral radius past the riser wall (was +1.0 absolute)
     )
     components["outlet_riser"] = rs_wp.val()
 
@@ -343,6 +363,49 @@ def create_ihx(spec: Dict[str, Any]) -> cq.Workplane:
     # not all shared cylindrical faces with both tube-sheet plates are detected.
     for ts in tube_solids:
         fused = fused.union(cq.Workplane().newObject([ts]))
+
+    # ── Open the fluid passages (post-fusion bore cutters) ──────────────
+    # Fusion guarantees METAL continuity only: the solid tube-sheet plates
+    # and the plenum wall fill every bore where a tube or the central pipe
+    # crosses them. Cut the bores back open (same pattern as the pump's
+    # bore punches). All margins are _overshoot-relative — scale-free.
+    #
+    # 1. Tube bores through BOTH tube-sheet plates (two slab cuts per tube;
+    #    the bore inside the tube's own length is already open).
+    _slabs = [(z_lp_top - lp_wall - _overshoot, z_lp_top + _overshoot),
+              (z_up_bot - _overshoot,           z_up_bot + up_wall + _overshoot)]
+    tube_bores = []
+    for ring in tube_rings:
+        r_ir = float(ring["inner_radius"])
+        for tx, ty in _ring_xy(ring):
+            for z0, z1 in _slabs:
+                tube_bores.append(
+                    cq.Workplane("XY").workplane(offset=(z0 + z1) / 2)
+                    .center(tx, ty).cylinder(z1 - z0, r_ir).val())
+    fused = fused.cut(
+        cq.Workplane().newObject([cq.Compound.makeCompound(tube_bores)]))
+    #
+    # 2. Central-pipe bore: swept along the SAME centerline, extended
+    #    downward through the lower tube sheet (mouth opens into the lower
+    #    plenum) and past the far end. Cutting it re-opens the crossings
+    #    through the upper-plenum bottom plate and the +X wall, while the
+    #    pipe's own wall stays intact — pipe and plenum never communicate.
+    z_bore_bot = z_lp_top - lp_wall - _overshoot
+    cp_bore_path = (
+        cq.Workplane("XZ")
+        .moveTo(0, z_bore_bot)
+        .lineTo(0, z_cp_bend)
+        .radiusArc((cp_bend, z_cp_horiz), cp_bend)
+        .lineTo(x_cp_far + _overshoot, z_cp_horiz)
+        .wire().val()
+    )
+    cp_bore = (
+        cq.Workplane("XY").workplane(offset=z_bore_bot)
+        .circle(cp_ir)
+        .sweep(cq.Workplane("XY").newObject([cp_bore_path]), isFrenet=True)
+    )
+    fused = fused.cut(cp_bore)
+
     return fused.clean()
 
 
