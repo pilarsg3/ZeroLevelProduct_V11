@@ -63,7 +63,6 @@ TOP_PLATE = {
     # based on component positions and dimensions.
     # Users can optionally:
     #   - Add custom holes in hole_groups
-    #   - Override clearance: "auto_hole_clearance": 0.02
     #   - Disable auto-gen per-component: add "auto_hole": false to component dict
     #   - Override hole diameter: add "hole_diameter": X to component dict
 }
@@ -83,7 +82,6 @@ def _make_ihx(obj_id, angle_deg):
         "upper_plenum_height":       0.600, "upper_plenum_dome_radius": 0.785,
         "bundle_height":             7.0,
         "tube_rings": [
-            dict(n=8,  inner_radius=0.020, wall=0.003, pitch_radius=0.12),
             dict(n=16, inner_radius=0.018, wall=0.003, pitch_radius=0.25),
             dict(n=24, inner_radius=0.016, wall=0.003, pitch_radius=0.40),
             dict(n=32, inner_radius=0.014, wall=0.003, pitch_radius=0.55),
@@ -131,6 +129,7 @@ def _make_pump(obj_id, angle_deg):
         "flange_width":      0.548,
         "flange_height":     0.900,
         "flange_depth":      0.500,
+        "flange_z_top":      11.5,
         "at_radius":         3.369,
         "at_angle_deg":      angle_deg,
     }
@@ -260,6 +259,7 @@ show(assemble_objects(
     [RV, TOP_PLATE, IHX1, IHX2, IHX3, IHX4, PUMP1, PUMP2, PUMP3, PUMP4,
      DIAGRID, CORE, STRONGBACK, REDAN, ABOVE_CORE_STRUCTURE],
     export_path=f"output/esfr_smr_full_reactor_2_{_TS}.step",
+    units="m",
 ))
 
 

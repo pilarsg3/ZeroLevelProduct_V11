@@ -74,7 +74,6 @@ def _make_ihx(obj_id, angle_deg):
         "upper_plenum_height":       0.650, "upper_plenum_dome_radius": 0.805,
         "bundle_height":             6.5,
         "tube_rings": [
-            dict(n=8,  inner_radius=0.020, wall=0.003, pitch_radius=0.12),
             dict(n=16, inner_radius=0.018, wall=0.003, pitch_radius=0.25),
             dict(n=24, inner_radius=0.016, wall=0.003, pitch_radius=0.40),
             dict(n=32, inner_radius=0.014, wall=0.003, pitch_radius=0.55),
@@ -118,6 +117,7 @@ def _make_pump(obj_id, angle_deg):
         "flange_width":      0.560,
         "flange_height":     0.900,
         "flange_depth":      0.500,
+        "flange_z_top":      11.5,
         "at_radius":         _PUMP_R,
         "at_angle_deg":      angle_deg,
     }
@@ -229,4 +229,4 @@ user_dicts = [
 ]
 
 _TS = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-show(assemble_objects(user_dicts, export_path=f"output/esfr_smr_4ihx_hex_core_{_TS}.step"))
+show(assemble_objects(user_dicts, export_path=f"output/esfr_smr_4ihx_hex_core_{_TS}.step", units="m"))
